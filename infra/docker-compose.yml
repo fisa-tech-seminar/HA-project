@@ -1,0 +1,270 @@
+version: "3.8"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+    restart: unless-stopped
+    networks: [monitoring]
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node_exporter
+    command: ["--path.rootfs=/host"]
+    ports:
+      - "9100:9100"
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+    networks: [monitoring]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
+    networks: [monitoring]
+
+  # -------------------------
+  # MySQL Primary
+  # -------------------------
+  mysql_primary:
+    image: mysql:8.0.44
+    hostname: mysql_primary
+    container_name: mysql_primary
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpw123!
+      - MYSQL_DATABASE=app
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-replica-updates=ON
+      - --default-authentication-plugin=mysql_native_password
+      - --report-host=mysql_primary
+      - --report-port=3306
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_primary_data:/var/lib/mysql
+      - ./mysql/primary-init.sql:/docker-entrypoint-initdb.d/primary-init.sql:ro
+    restart: unless-stopped
+    networks: [monitoring]
+
+  mysqld_exporter_primary:
+    image: prom/mysqld-exporter:v0.16.0
+    container_name: mysqld_exporter_primary
+    command:
+      - "--config.my-cnf=/etc/mysqld_exporter/exporter.cnf"
+      - "--mysqld.address=mysql_primary:3306"
+    volumes:
+      - ./mysql/exporter-primary.cnf:/etc/mysqld_exporter/exporter.cnf:ro
+    ports:
+      - "9104:9104"
+    depends_on: [mysql_primary]
+    restart: unless-stopped
+    networks: [monitoring]
+
+  # -------------------------
+  # MySQL Replica
+  # -------------------------
+  mysql_replica:
+    image: mysql:8.0.44
+    container_name: mysql_replica
+    hostname: mysql_replica
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpw123!
+    command:
+      - --server-id=2
+      - --relay-log=relay-bin
+      - --log-bin=mysql-bin
+      - --log-replica-updates=ON
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --default-authentication-plugin=mysql_native_password
+      - --report-host=mysql_replica
+      - --report-port=3306
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_replica_data:/var/lib/mysql
+      - ./mysql/replica-init.sql:/docker-entrypoint-initdb.d/replica-init.sql:ro
+    depends_on: 
+      - mysql_primary
+    restart: unless-stopped
+    networks: [monitoring]
+
+  mysqld_exporter_replica:
+    image: prom/mysqld-exporter:v0.16.0
+    container_name: mysqld_exporter_replica
+    command:
+      - "--config.my-cnf=/etc/mysqld_exporter/exporter.cnf"
+      - "--mysqld.address=mysql_replica:3306"
+    volumes:
+      - ./mysql/exporter-replica.cnf:/etc/mysqld_exporter/exporter.cnf:ro
+    ports:
+      - "9105:9104"
+    depends_on: [mysql_replica]
+    restart: unless-stopped
+    networks: [monitoring]
+
+  #-----------------
+  # mysql replica2
+  # ----------------
+  mysql_replica2:
+    image: mysql:8.0.44
+    container_name: mysql_replica2
+    hostname: mysql_replica2
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpw123!
+    command:
+      - --server-id=3
+      - --relay-log=relay-bin
+      - --log-bin=mysql-bin
+      - --log-replica-updates=ON
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --default-authentication-plugin=mysql_native_password
+      - --report-host=mysql_replica2
+      - --report-port=3306
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_replica2_data:/var/lib/mysql
+      - ./mysql/replica-init.sql:/docker-entrypoint-initdb.d/replica-init.sql:ro
+    depends_on:
+      - mysql_primary
+    restart: unless-stopped
+    networks: [monitoring]
+
+  mysqld_exporter_replica2:
+    image: prom/mysqld-exporter:v0.16.0
+    container_name: mysqld_exporter_replica2
+    command:
+      - "--config.my-cnf=/etc/mysqld_exporter/exporter.cnf"
+      - "--mysqld.address=mysql_replica2:3306"
+    volumes:
+      - ./mysql/exporter-replica2.cnf:/etc/mysqld_exporter/exporter.cnf:ro
+    ports:
+      - "9106:9104"
+    depends_on: [mysql_replica2]
+    restart: unless-stopped
+    networks: [monitoring]
+
+
+  replica-setup:
+    image: mysql:8.0.44
+    container_name: replica_setup
+    restart: "no"
+    volumes:
+      # 현재 트리 구조에 맞춰 경로 지정 (./mysql/setup-replication.sh)
+      - ./mysql/setup-replication.sh:/setup-replication.sh:ro
+    # Replica DB가 뜰 때까지 기다렸다가 스크립트 실행
+    entrypoint: ["/bin/bash", "/setup-replication.sh"]
+    depends_on:
+      - mysql_replica
+      - mysql_replica2
+    networks: [monitoring]
+
+  orchestrator-db:
+    image: mysql:8.0.44
+    container_name: orchestrator-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw123!
+      MYSQL_DATABASE: orchestrator
+    command: >
+      --skip-name-resolve
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - orchestrator_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpw123!"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    networks: [monitoring]
+
+  orchestrator:
+    image: openarkcode/orchestrator:latest
+    container_name: orchestrator
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./orchestrator/orchestrator.conf.json:/etc/orchestrator.conf.json:ro
+    depends_on:
+      orchestrator-db:
+        condition: service_healthy
+      mysql_primary:
+        condition: service_started
+      mysql_replica:
+        condition: service_started
+      mysql_replica2:
+        condition: service_started
+    restart: unless-stopped
+    networks: [monitoring]
+
+  proxysql:
+    image: proxysql/proxysql:3.0.3
+    container_name: proxysql
+    ports:
+      - "3307:6033"   # 앱이 붙는 포트 (MySQL traffic)
+      - "6032:6032"   # ProxySQL Admin 포트
+    volumes:
+      - ./proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
+    command: ["proxysql", "-f", "-c", "/etc/proxysql.cnf", "--initial"]
+    depends_on:
+      - mysql_primary
+      - mysql_replica
+      - mysql_replica2
+    restart: unless-stopped
+    networks: [monitoring]
+
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  mysql_primary_data:
+  mysql_replica_data:
+  mysql_replica2_data:
+  orchestrator_db_data:
+
+networks:
+  monitoring:
+    driver: bridge
