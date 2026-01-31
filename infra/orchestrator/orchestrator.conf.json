@@ -1,0 +1,27 @@
+{
+  "Debug": true,
+  "ListenAddress": ":3000",
+
+  "BackendDB": "mysql",
+  "MySQLOrchestratorHost": "orchestrator-db",
+  "MySQLOrchestratorPort": 3306,
+  "MySQLOrchestratorDatabase": "orchestrator",
+  "MySQLOrchestratorUser": "root",
+  "MySQLOrchestratorPassword": "rootpw123!",
+
+  "MySQLTopologyUser": "orch",
+  "MySQLTopologyPassword": "orchpass",
+
+  "DiscoverByShowSlaveHosts": true,
+  "InstancePollSeconds": 5,
+
+  "RecoverMasterClusterFilters": [],
+  "RecoverIntermediateMasterClusterFilters": [],
+  "PromotionRule": "prefer",
+  "FailureDetectionPeriodBlockMinutes": 1,
+
+  "RecoverMasterCluster": true,
+  "AutoRecoverMasterCluster": true
+
+}
+

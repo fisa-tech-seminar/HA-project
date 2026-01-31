@@ -1,0 +1,53 @@
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+  admin_credentials="admin:admin"
+  mysql_ifaces="0.0.0.0:6032"
+}
+
+mysql_variables=
+{
+  threads=4
+  max_connections=2048
+  interfaces="0.0.0.0:6033"
+  mysql-monitor_username="monitor"
+  mysql-monitor_password="monitor"
+  mysql-monitor_connect_interval=2000
+}
+# Writer/Reader 자동 분류(핵심)
+mysql_replication_hostgroups =
+(
+  {
+    writer_hostgroup=10
+    reader_hostgroup=20
+    check_type="read_only"
+  }
+)
+
+# 백엔드 MySQL 서버 등록
+mysql_servers =
+(
+  { address="mysql_primary", port=3306, hostgroup_id=10, max_connections=100 },
+  { address="mysql_replica", port=3306, hostgroup_id=20, max_connections=100 },
+  { address="mysql_replica2", port=3306, hostgroup_id=20, max_connections=100 }
+)
+
+# 앱이 ProxySQL에 붙을 계정 (예: appuser)
+mysql_users =
+(
+  { username="appuser", password="apppass", default_hostgroup=10, active=1 }
+)
+
+# 라우팅 룰(선택): SELECT는 reader로, 그 외는 writer로
+mysql_query_rules =
+(
+  {
+    rule_id=1
+    active=1
+    match_pattern="^SELECT.*"
+    destination_hostgroup=20
+    apply=1
+  }
+)
+
