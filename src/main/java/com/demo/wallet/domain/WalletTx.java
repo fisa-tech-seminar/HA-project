@@ -2,8 +2,12 @@ package com.demo.wallet.domain;
 
 import java.time.LocalDateTime;
 
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
@@ -23,6 +27,7 @@ import jakarta.persistence.UniqueConstraint;
         @Index(name = "idx_user_created", columnList = "user_id, created_at")
     }
 )
+@EntityListeners(AuditingEntityListener.class)
 public class WalletTx {
 
 	@Id
@@ -48,7 +53,8 @@ public class WalletTx {
     @Column(name = "idempotency_key", nullable = false, length = 64)
     private String idempotencyKey;
 
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
     @Column(name = "balance_after")
