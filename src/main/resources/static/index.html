@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Digital Wallet Demo</title>
+
+  <!-- Tailwind CDN (빠르게 서비스 느낌 내기) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* 작은 서비스 감성 */
+    .glass { backdrop-filter: blur(10px); background: rgba(255,255,255,0.7); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="mx-auto max-w-5xl px-4 py-8">
+    <!-- Header -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold">Digital Wallet 🪙</h1>
+        <p class="text-sm text-slate-600">HA Demo UI (Spring Boot + ProxySQL + MySQL Replication)</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span id="connBadge" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-slate-200 text-slate-700">
+          ● Idle
+        </span>
+
+        <button id="clearLogBtn"
+                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50">
+          로그 지우기
+        </button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <!-- User / Balance -->
+      <div class="glass rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-base font-semibold">지갑 상태</h2>
+            <p class="text-xs text-slate-600">잔액 조회 및 기본 설정</p>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-3">
+          <label class="block text-sm font-medium text-slate-700">User ID</label>
+          <input id="userIdInput" type="number" min="1" value="1001"
+                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"/>
+
+          <button id="balanceBtn"
+                  class="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
+            잔액 조회
+          </button>
+
+          <div class="rounded-xl bg-white border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Current Balance</div>
+            <div class="mt-1 text-2xl font-semibold">
+              <span id="balanceText">-</span>
+              <span class="text-sm font-normal text-slate-500">원</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500 mono">
+              lastTxId: <span id="lastTxId">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Topup -->
+      <div class="glass rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <h2 class="text-base font-semibold">충전</h2>
+        <p class="text-xs text-slate-600">POST /topup</p>
+
+        <div class="mt-4 space-y-3">
+          <label class="block text-sm font-medium text-slate-700">Amount</label>
+          <input id="topupAmount" type="number" min="1" value="1000"
+                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"/>
+
+          <div class="flex items-center justify-between gap-3">
+            <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+              <input id="fixedIdempoTopup" type="checkbox" class="h-4 w-4 rounded border-slate-300">
+              멱등키 고정(재전송 테스트)
+            </label>
+            <button id="genTopupKeyBtn" class="text-xs text-slate-700 underline hover:text-slate-900">
+              키 새로 생성
+            </button>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs mono break-all">
+            <div class="text-slate-500">Idempotency-Key</div>
+            <div id="topupKey" class="mt-1">-</div>
+          </div>
+
+          <button id="topupBtn"
+                  class="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-500">
+            충전 실행
+          </button>
+        </div>
+      </div>
+
+      <!-- Pay -->
+      <div class="glass rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <h2 class="text-base font-semibold">결제</h2>
+        <p class="text-xs text-slate-600">POST /pay</p>
+
+        <div class="mt-4 space-y-3">
+          <label class="block text-sm font-medium text-slate-700">Amount</label>
+          <input id="payAmount" type="number" min="1" value="700"
+                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"/>
+
+          <div class="flex items-center justify-between gap-3">
+            <label class="inline-flex items-center gap-2 text-xs text-slate-600">
+              <input id="fixedIdempoPay" type="checkbox" class="h-4 w-4 rounded border-slate-300">
+              멱등키 고정(재전송 테스트)
+            </label>
+            <button id="genPayKeyBtn" class="text-xs text-slate-700 underline hover:text-slate-900">
+              키 새로 생성
+            </button>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs mono break-all">
+            <div class="text-slate-500">Idempotency-Key</div>
+            <div id="payKey" class="mt-1">-</div>
+          </div>
+
+          <button id="payBtn"
+                  class="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500">
+            결제 실행
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto Load / Failover Demo -->
+    <div class="mt-4 glass rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Failover 시연용 트래픽</h2>
+          <p class="text-xs text-slate-600">주기적으로 결제를 날려 장애/복구 시 응답 변화를 관찰</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input id="intervalMs" type="number" min="200" value="800"
+                 class="w-28 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"/>
+          <span class="text-sm text-slate-600">ms</span>
+
+          <button id="autoBtn"
+                  class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
+            Auto Load 시작
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+          <div class="text-xs text-slate-500">Requests</div>
+          <div id="reqCount" class="mt-1 text-xl font-semibold">0</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+          <div class="text-xs text-slate-500">Success</div>
+          <div id="okCount" class="mt-1 text-xl font-semibold">0</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+          <div class="text-xs text-slate-500">Fail</div>
+          <div id="failCount" class="mt-1 text-xl font-semibold">0</div>
+        </div>
+      </div>
+
+      <div class="mt-3 text-xs text-slate-600">
+        ※ Auto Load는 <span class="mono">PAY</span>를 반복 호출합니다. 장애 시 5xx/timeout 후 복구되면 다시 성공하는 흐름을 보여주기에 좋습니다.
+      </div>
+    </div>
+
+    <!-- Logs -->
+    <div class="mt-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <h3 class="text-sm font-semibold">API 로그</h3>
+        <div class="text-xs text-slate-500">최근 응답이 위로 쌓입니다</div>
+      </div>
+      <div id="log" class="max-h-[360px] overflow-auto p-4 space-y-3"></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const base = ''; // same-origin
+    const badge = $('connBadge');
+
+    let topupKey = crypto.randomUUID();
+    let payKey = crypto.randomUUID();
+    $('topupKey').textContent = topupKey;
+    $('payKey').textContent = payKey;
+
+    let autoTimer = null;
+    let req = 0, ok = 0, fail = 0;
+
+    function setBadge(state, kind='idle') {
+      const map = {
+        idle:  ['● Idle',   'bg-slate-200 text-slate-700'],
+        ok:    ['● OK',     'bg-emerald-100 text-emerald-700'],
+        warn:  ['● WARN',   'bg-amber-100 text-amber-700'],
+        err:   ['● ERROR',  'bg-rose-100 text-rose-700'],
+        busy:  ['● Busy',   'bg-sky-100 text-sky-700'],
+      };
+      const [text, cls] = map[kind] || map.idle;
+      badge.textContent = text + ' · ' + state;
+      badge.className = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ' + cls;
+    }
+
+    function logLine(title, obj, kind='info') {
+      const color = kind === 'error' ? 'border-rose-200 bg-rose-50'
+                  : kind === 'warn'  ? 'border-amber-200 bg-amber-50'
+                  : 'border-slate-200 bg-slate-50';
+
+      const el = document.createElement('div');
+      el.className = `rounded-xl border ${color} p-3`;
+      el.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold">${title}</div>
+          <div class="text-xs text-slate-500">${new Date().toLocaleTimeString()}</div>
+        </div>
+        <pre class="mt-2 text-xs mono whitespace-pre-wrap break-words">${escapeHtml(JSON.stringify(obj, null, 2))}</pre>
+      `;
+      $('log').prepend(el);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+
+    function getUserId() {
+      const v = Number($('userIdInput').value);
+      if (!v || v <= 0) throw new Error('userId는 1 이상이어야 합니다.');
+      return v;
+    }
+
+    async function apiFetch(path, opts={}) {
+      setBadge('requesting...', 'busy');
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 4000); // 데모용 타임아웃(4s)
+      try {
+        const res = await fetch(base + path, { ...opts, signal: controller.signal });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok || json?.success === false) {
+          setBadge(`HTTP ${res.status}`, 'err');
+          logLine(`${opts.method || 'GET'} ${path} (FAIL)`, { httpStatus: res.status, body: json }, 'error');
+          throw new Error(json?.error?.message || `HTTP ${res.status}`);
+        }
+
+        setBadge(`HTTP ${res.status}`, 'ok');
+        logLine(`${opts.method || 'GET'} ${path} (OK)`, json, 'info');
+        return json;
+      } catch (e) {
+        const msg = e.name === 'AbortError' ? 'timeout (4s)' : (e.message || 'unknown error');
+        setBadge(msg, 'err');
+        throw e;
+      } finally {
+        clearTimeout(t);
+      }
+    }
+
+    async function refreshBalance() {
+      const userId = getUserId();
+      const json = await apiFetch(`/api/v1/wallets/${userId}`, { method: 'GET' });
+      $('balanceText').textContent = json.data.balance;
+      return json;
+    }
+
+    $('balanceBtn').addEventListener('click', async () => {
+      try { await refreshBalance(); } catch {}
+    });
+
+    $('genTopupKeyBtn').addEventListener('click', () => {
+      topupKey = crypto.randomUUID();
+      $('topupKey').textContent = topupKey;
+    });
+
+    $('genPayKeyBtn').addEventListener('click', () => {
+      payKey = crypto.randomUUID();
+      $('payKey').textContent = payKey;
+    });
+
+    $('topupBtn').addEventListener('click', async () => {
+      try {
+        const userId = getUserId();
+        const amount = Number($('topupAmount').value);
+        if (!amount || amount <= 0) throw new Error('amount는 1 이상이어야 합니다.');
+
+        const fixed = $('fixedIdempoTopup').checked;
+        const key = fixed ? topupKey : crypto.randomUUID();
+        if (!fixed) $('topupKey').textContent = key;
+
+        const json = await apiFetch(`/api/v1/wallets/${userId}/topup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': key
+          },
+          body: JSON.stringify({ amount })
+        });
+
+        $('lastTxId').textContent = json.data.txId ?? '-';
+        $('balanceText').textContent = json.data.balanceAfter ?? '-';
+      } catch (e) {
+        logLine('TOPUP error', { message: e.message }, 'warn');
+      }
+    });
+
+    $('payBtn').addEventListener('click', async () => {
+      try {
+        const userId = getUserId();
+        const amount = Number($('payAmount').value);
+        if (!amount || amount <= 0) throw new Error('amount는 1 이상이어야 합니다.');
+
+        const fixed = $('fixedIdempoPay').checked;
+        const key = fixed ? payKey : crypto.randomUUID();
+        if (!fixed) $('payKey').textContent = key;
+
+        const json = await apiFetch(`/api/v1/wallets/${userId}/pay`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': key
+          },
+          body: JSON.stringify({ amount })
+        });
+
+        $('lastTxId').textContent = json.data.txId ?? '-';
+        $('balanceText').textContent = json.data.balanceAfter ?? '-';
+      } catch (e) {
+        // 잔액부족(409)도 여기로 떨어짐 → 로그에 표시됨
+        logLine('PAY error', { message: e.message }, 'warn');
+      }
+    });
+
+    $('clearLogBtn').addEventListener('click', () => {
+      $('log').innerHTML = '';
+      setBadge('cleared', 'idle');
+    });
+
+    $('autoBtn').addEventListener('click', async () => {
+      if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+        $('autoBtn').textContent = 'Auto Load 시작';
+        setBadge('stopped', 'idle');
+        return;
+      }
+
+      // 시작
+      req = ok = fail = 0;
+      $('reqCount').textContent = req;
+      $('okCount').textContent = ok;
+      $('failCount').textContent = fail;
+
+      $('autoBtn').textContent = 'Auto Load 중지';
+      setBadge('running', 'busy');
+
+      const tick = async () => {
+        try {
+          req++;
+          $('reqCount').textContent = req;
+
+          const userId = getUserId();
+          const amount = Number($('payAmount').value) || 1;
+
+          // Auto Load는 매번 새로운 멱등키 (실제 트래픽처럼)
+          const key = crypto.randomUUID();
+
+          await apiFetch(`/api/v1/wallets/${userId}/pay`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': key
+            },
+            body: JSON.stringify({ amount })
+          });
+
+          ok++;
+          $('okCount').textContent = ok;
+
+          // 성공하면 잔액도 갱신
+          await refreshBalance().catch(() => {});
+        } catch (e) {
+          fail++;
+          $('failCount').textContent = fail;
+        }
+      };
+
+      // 즉시 1회 실행 후 interval
+      await tick();
+      const ms = Math.max(200, Number($('intervalMs').value) || 800);
+      autoTimer = setInterval(tick, ms);
+    });
+
+    // 초기 로딩 시 잔액 한번 조회
+    refreshBalance().catch(() => setBadge('ready', 'idle'));
+  </script>
+</body>
+</html>
