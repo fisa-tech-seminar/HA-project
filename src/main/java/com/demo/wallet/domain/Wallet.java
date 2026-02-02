@@ -2,13 +2,18 @@ package com.demo.wallet.domain;
 
 import java.time.LocalDateTime;
 
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(name="wallet")
+@EntityListeners(AuditingEntityListener.class)
 public class Wallet {
 	
 	@Id
@@ -23,7 +28,8 @@ public class Wallet {
     @Column(name = "version", nullable = false)
     private Integer version;
 
-    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     protected Wallet() {

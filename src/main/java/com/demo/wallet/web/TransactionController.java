@@ -21,7 +21,7 @@ public class TransactionController {
     }
 
     @GetMapping("/transactions/{idempotencyKey}")
-    public ApiResponse<WalletTxResponse> getTx(@PathVariable String idempotencyKey) {
+    public ApiResponse<WalletTxResponse> getTx(@PathVariable("idempotencyKey") String idempotencyKey) {
         WalletTx tx = walletTxRepository.findByIdempotencyKey(idempotencyKey)
                 .orElseThrow(() -> new NotFoundException("Transaction not found"));
         return ApiResponse.ok(new WalletTxResponse(
