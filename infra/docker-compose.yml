@@ -246,6 +246,7 @@ services:
     ports:
       - "3307:6033"   # 앱이 붙는 포트 (MySQL traffic)
       - "6032:6032"   # ProxySQL Admin 포트
+      - "6070:6070"
     volumes:
       - ./proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
     command: ["proxysql", "-f", "-c", "/etc/proxysql.cnf", "--initial"]
@@ -255,7 +256,6 @@ services:
       - mysql_replica2
     restart: unless-stopped
     networks: [monitoring]
-
 
 volumes:
   prometheus_data:
