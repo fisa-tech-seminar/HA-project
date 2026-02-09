@@ -22,7 +22,7 @@
 
 ## 📸 Architecture Overview
 
-애플리케이션은 DB 토폴로지를 알 필요 없이 **단일 엔드포인트(ProxySQL)**만 바라보며, HA와 Failover는 인프라 레이어에서 전담하는 구조입니다.
+애플리케이션은 DB 토폴로지를 알 필요 없이 **단일 엔드포인트(ProxySQL)** 만 바라보며, HA와 Failover는 인프라 레이어에서 전담하는 구조입니다.
 
 <img width="744" height="522" alt="image" src="https://github.com/user-attachments/assets/af85695b-822c-48e9-9855-2d513fc22c16" />
 
@@ -44,12 +44,12 @@
 [시연 GIF]
 
 1. **Normal State:** 트래픽이 ProxySQL을 통해 Primary DB로 정상 유입
-2. **Failure Injection: “**docker stop mysql_primary” 명령어로 강제 장애 발생
+2. **Failure Injection:** **“docker stop mysql_primary”** 명령어로 강제 장애 발생
 3. **Detection & Decision:** Orchestrator가 장애 감지 및 관리자 Slack 알림
     
      관리자가 Grafana 대시보드에서 Replication Lag 및 Replica DB 상태 확인 후 Failover 실행
     
-4. **Failover:** Orchestrator가 ****최적의 Replica DB를 새로운 Master DB로 승격
+4. **Failover:** Orchestrator가 최적의 Replica DB를 새로운 Master DB로 승격
 5. **Routing Update:** ProxySQL이 토폴로지 변경을 감지하고 트래픽을 새로운 Master DB로 즉시 전환
 6. **Recovery:** 모니터링으로 서비스 복구 이후 결제/충전 기능 정상 동작 확인
 
@@ -74,9 +74,7 @@
 - **동시성 제어 (Concurrency Control):**
     - `SELECT ... FOR UPDATE` (Pessimistic Lock)을 사용하여 충전/결제 시 Race Condition 원천 차단
 - **멱등성 보장 (Idempotency):**
-    - 네트워크 타임아웃/재시도 상황에서 중복 결제를 막기 위해
-        
-        Idempotency-Key 기반의 중복 요청 필터링 구현
+    - 네트워크 타임아웃/재시도 상황에서 중복 결제를 막기 위해 Idempotency-Key 기반의 중복 요청 필터링 구현
         
 
 ### 2. Infrastructure Layer (High Availability)
@@ -96,11 +94,15 @@
 ### 1. MySQL Replication 설정 자동화 및 Race Condition 해결
 
 - **Problem:** docker-compose로 다중 컨테이너 실행 시, MySQL 컨테이너가 완전히 구동되기 전에 복제 설정 명령어가 실행되어 연결 실패 및 엔드포인트 불일치 문제가 지속적으로 발생
+  
 - **Process:**
     - 초기에는 command 옵션과 depends_on 옵션으로 해결하려 했지만 컨테이너 초기화 속도 차이로 인한 **Race Condition**을 제어하기 어려움
     - 수동 설정은 휴먼 에러를 유발하므로 배제
+      
 - **Solution:** **'Setup Container(Sidecar Pattern)'** 도입
-별도의 일회성 컨테이너를 추가하여, Master/Replica의 헬스 체크를 선행하고 이후 복제 설정까지 하는 쉘 스크립트를 실행하도록 구성
+  
+    별도의 일회성 컨테이너를 추가하여, Master/Replica의 헬스 체크를 선행하고 이후 복제 설정까지 하는 쉘 스크립트를 실행하도록 구성
+  
 - **Outcome:** `docker compose up -d` 명령어 하나 만으로 Master-Replica 이중화 환경이 완벽하게 구성되도록 자동화 설정
 
 <br>
@@ -109,12 +111,15 @@
 
 - **Problem:** 초기에 도입한 HAProxy는 **TCP(Layer 4) 기반**으로 동작하여 쿼리의 내용을 분석해 라우팅하지 못하는 문제 발생
 단순 Port 기반 분산은 가능했으나, 동시성 제어를 위한 `SELECT ... FOR UPDATE` 쿼리까지 Replica로 분산되어 Lock이 동작하지 않는 치명적인 **정합성 이슈 발생**
+
 - **Process:**
     - 외부 스크립트를 통해 read_only 값을 체크하여 라우팅하려 했으나, 구조가 복잡해지고 관리 포인트가 늘어나는 단점 존재
-    - 쿼리 내용을 분석하여 Read/Write 요청을 분류하여 라우팅 할 수 있는 **Layer 7 Database Proxy**의 필요성 확인
+    - 쿼리 내용을 분석하여 라우팅 할 수 있는 **Layer 7 Database Proxy**의 필요성 확인
+      
 - **Solution:** **ProxySQL**로 기술 스택 변경 및 **Query Rules** 적용
-    - **Rule 1:** `^SELECT.*FOR UPDATE$` 정규식을 매칭하여 강제로 **Hostgroup 10(Writer)**로 라우팅
-    - **Rule 2:** 일반 `^SELECT` 쿼리는 **Hostgroup 20(Reader)**로 라우팅하여 부하 분산
+    - **Rule 1:** `^SELECT.*FOR UPDATE$` 정규식을 매칭하여 강제로 **Hostgroup 10(Writer)** 로 라우팅
+    - **Rule 2:** 일반 `^SELECT` 쿼리는 **Hostgroup 20(Reader)** 로 라우팅하여 부하 분산
+      
 - **Outcome:** 애플리케이션 코드 수정 없이 인프라 레벨에서 **Read/Write Splitting**과 **Transactional Consistency**를 동시에 달성
 
 ---
@@ -123,7 +128,7 @@
 
 | **Category** | **Technology** |
 | --- | --- |
-| **Language & Framework** | Java 17, Spring Boot 3.0, Spring Data JPA, Hibernate |
+| **Language & Framework** | Java 17, Spring Boot 3.5, Spring Data JPA, Hibernate |
 | **Database** | MySQL 8.0 (GTID Replication) |
 | **HA & Routing** | **ProxySQL**, **Orchestrator** |
 | **Monitoring** | **Prometheus**, **Grafana**, mysqld_exporter |
