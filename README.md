@@ -52,7 +52,9 @@
 
 실제 운영 환경을 모사하여 Primary DB에 장애를 유발하고 시스템을 복구하는 과정을 검증했습니다.
 
-[시연 GIF]
+![기술세미나_시연](https://github.com/user-attachments/assets/d2634bfe-0e68-4ec6-8efe-b74ec762ba17)
+
+
 
 1. **Normal State:** 트래픽이 ProxySQL을 통해 Primary DB로 정상 유입
 2. **Failure Injection:** **“docker stop mysql_primary”** 명령어로 강제 장애 발생
