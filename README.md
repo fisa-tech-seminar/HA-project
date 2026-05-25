@@ -1,4 +1,4 @@
-# 🏷️ HA-project (DB 이중화)
+# 🏷️ HA-project (DB 이중화)  
 
 > **Digital Wallet DB High Availability Demo** 💰
 > 
